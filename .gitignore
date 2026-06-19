@@ -30,7 +30,9 @@ Release/
 *.ilk
 *.idb
 *.exp
- 
+*.rnx
+*.crx
+*.crx.gz 
 # ── Python cache (when you start using Python) ────────────────────
 __pycache__/
 *.pyc

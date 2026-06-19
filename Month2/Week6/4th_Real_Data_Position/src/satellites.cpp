@@ -1,0 +1,196 @@
+#include "satellites.h"
+#include <fstream>
+#include <sstream>
+#include <iostream>
+#include <cmath>
+
+using namespace std;
+
+const double MU_EARTH = 3.986005e14;
+const double OMEGA_EARTH = 7.2921151467e-5;
+
+// Helper functions (static = private to this file)
+static double solveKepler(double M, double e) {
+    double E = M;
+    for (int i = 0; i < 20; i++) {
+        double E_new = M + e * sin(E);
+        if (abs(E_new - E) < 1e-12) return E_new;
+        E = E_new;
+    }
+    return E;
+}
+
+static string fortranToCpp(const string& s) {
+    string out = s;
+    for (char& c : out) if (c == 'D' || c == 'd') c = 'E';
+    return out;
+}
+
+static double parseField(const string& line, size_t start, size_t len = 19) {
+    if (start >= line.length()) return 0.0;
+    string field = fortranToCpp(line.substr(start, len));
+    try { return stod(field); }
+    catch (...) { return 0.0; }
+}
+
+static void readOrbitLine(const string& line, double& v1, double& v2,
+    double& v3, double& v4) {
+    v1 = parseField(line, 4);  v2 = parseField(line, 23);
+    v3 = parseField(line, 42); v4 = parseField(line, 61);
+}
+
+// Then paste your three functions here:
+// - parseRinexNav()
+// Main Parser
+vector<GpsEphemeris> parseRinexNav(const string& filename)
+{
+	vector<GpsEphemeris> ephemerides;
+	ifstream file(filename);
+	if (!file.is_open())
+	{
+		cerr << "Error: Can not Open the" << filename << endl;
+		return ephemerides;
+	}
+
+	string line;
+	bool header_done = false;
+
+	// skip the header
+	while (getline(file, line))
+	{
+		if (line.find("END OF HEADER") != string::npos)
+		{
+			header_done = true;
+			break;
+		}
+	}
+	if (!header_done)
+	{
+		cerr << "Error: No END OF HEADER found" << endl;
+		return ephemerides;
+	}
+
+
+	// Step2 : Read records
+	while (getline(file, line))
+	{
+		//skip empty lines
+		if (line.length() < 23) continue;
+
+		// GPS records start with 'G'
+		if (line[0] != 'G')
+		{
+			// skip non-GPS satellite for today (R, E, C. etc.)
+			// each line is 8 lines - skip 7 more lines
+			for (int i = 0; i < 7; i++)
+			{
+				if (!getline(file, line)) break;//!getline(file, line) becomes true if: End-of-file (EOF) is reached, or A read error occurs.
+			}
+			continue;
+		}
+
+		// Step3: We have a GPS record. Parse all 8 line.
+		GpsEphemeris eph = {}; // zero initialize
+		// line 0: PRN, Epoch, Clock parameters
+		try
+		{
+			eph.prn = stoi(line.substr(1, 2));
+			eph.year = stoi(line.substr(4, 4));
+			eph.month = stoi(line.substr(9, 2));
+			eph.day = stoi(line.substr(12, 2));
+			eph.hour = stoi(line.substr(15, 2));
+			eph.minute = stoi(line.substr(18, 2));
+			eph.second = parseField(line, 21, 2);
+		}
+		catch (...) { continue; }
+
+		eph.clk_bias = parseField(line, 23);
+		eph.clk_drift = parseField(line, 42);
+		eph.clk_drift_rate = parseField(line, 61);
+
+
+		// Lines 1-7: broadcast orbit parameters (4 numbers each)
+		if (!getline(file, line)) break;
+		readOrbitLine(line, eph.IODE, eph.Crs, eph.delta_n, eph.M0);
+
+		if (!getline(file, line)) break;
+		readOrbitLine(line, eph.Cuc, eph.e, eph.Cus, eph.sqrt_a);
+
+		if (!getline(file, line)) break;
+		readOrbitLine(line, eph.toe, eph.Cic, eph.Omega0, eph.Cis);
+
+		if (!getline(file, line)) break;
+		readOrbitLine(line, eph.i0, eph.Crc, eph.omega, eph.Omega_dot);
+
+		if (!getline(file, line)) break;
+		readOrbitLine(line, eph.i_dot, eph.L2_codes, eph.gps_week, eph.L2P_flag);
+
+		if (!getline(file, line)) break;
+		readOrbitLine(line, eph.sv_accuracy, eph.sv_health, eph.TGD, eph.IODC);
+
+		if (!getline(file, line)) break;
+		double spare1, spare2;
+		readOrbitLine(line, eph.trans_time, eph.fit_interval, spare1, spare2);
+
+
+		// Step 4: Store the complete ephemeris
+		ephemerides.push_back(eph);
+	}
+
+	file.close();
+	return ephemerides;
+}
+
+// - computeSatPosECEF()
+SatPosition computeSatPosECEF(const GpsEphemeris& eph, double t_gps)
+{
+	SatPosition pos;
+	double a = eph.sqrt_a * eph.sqrt_a;
+	double n = sqrt(MU_EARTH / (a * a * a)) + eph.delta_n;
+	double tk = t_gps - eph.toe;
+	if (tk > 302400.0) tk -= 604800.0;
+	if (tk < -302400.0) tk += 604800.0;
+	double Mk = eph.M0 + n * tk;
+	double Ek = solveKepler(Mk, eph.e);
+	double nuk = atan2(sqrt(1 - eph.e * eph.e) * sin(Ek), cos(Ek) - eph.e);
+	double phi_k = nuk + eph.omega;
+	double sin_2phi = sin(2 * phi_k), cos_2phi = cos(2 * phi_k);
+	double u_k = phi_k + eph.Cuc * cos_2phi + eph.Cus * sin_2phi;
+	double r_k = a * (1 - eph.e * cos(Ek)) + eph.Crc * cos_2phi + eph.Crs * sin_2phi;
+	double i_k = eph.i0 + eph.i_dot * tk + eph.Cic * cos_2phi + eph.Cis * sin_2phi;
+	double x_orb = r_k * cos(u_k);
+	double y_orb = r_k * sin(u_k);
+	double Omega_k = eph.Omega0 + (eph.Omega_dot - OMEGA_EARTH) * tk - OMEGA_EARTH * eph.toe;
+	pos.X = x_orb * cos(Omega_k) - y_orb * cos(i_k) * sin(Omega_k);
+	pos.Y = x_orb * sin(Omega_k) + y_orb * cos(i_k) * cos(Omega_k);
+	pos.Z = y_orb * sin(i_k);
+	return pos;
+}
+// - findBestEphemeris()
+// New Today: Pick the best ephemeris for a satellite at time t
+// Returns iterators to the ephemeris closest in time to t_gps for this prn
+// findBestEphemeris() answers this question:
+// "I have hundreds of ephemerides in my vector. Out of all of them, 
+// which one belongs to satellite #5 AND has a time-of-ephemeris closest to right now?"
+
+// Why this matters: Remember from Day 3, your BRDC file has 440 ephemerides(about 14 per satellite).
+// For each satellite, you have multiple versions recorded throughout the day.You want the one that's
+// most accurate for your target time — the one whose toe is closest to t_gps.
+// This function searches the entire vector and returns a pointer (address in memory) to the best match.
+
+//const: "Whatever I return, the caller can't modify it"
+//GpsEphemeris: The type of thing we're pointing to. 
+// *: POINTER — an address (where it is located in memory), not the data itself
+// So this function returns a pointer to a GpsEphemeris. NOT a copy.NOT the struct itself. Just its address in memory.
+const GpsEphemeris* findBestEphemeris(const vector<GpsEphemeris>& ephs, int prn, double t_gps)
+{
+	const GpsEphemeris* best = nullptr;      //nullptr means "no pointer yet — empty". We start with nothing found, then update as we discover matches.
+	double best_dt = 1e18;                  //will hold the time difference of the best match so far. We want to find the SMALLEST dt, so we start at a deliberately HUGE value.
+	for (const auto& e : ephs) {            //read-only reference to each element in the ALL 440 ephemerides. 
+		if (e.prn != prn) continue;
+		double dt = abs(e.toe - t_gps);
+		if (dt > 302400.0) dt = 604800.0 - dt;  // week rollover
+		if (dt < best_dt) { best_dt = dt; best = &e; }  //The & operator means "give me the address of". So, '&e' gives the address of e in the memory
+	}
+	return best;
+}

@@ -10,135 +10,61 @@
 
 ---
 
-## 🎯 About This Project
+## What This Engine Does (as of Month 2 complete)
+ 
+- Parses RINEX 3 navigation and observation files
+- Computes GPS satellite positions from broadcast ephemerides (IS-GPS-200)
+- Applies full satellite clock corrections:
+  - Polynomial (bias + drift + drift rate)
+  - Relativistic (Kepler-based)
+  - TGD (Timing Group Delay)
+- Corrects for Earth rotation during signal travel (Sagnac effect)
+- Applies elevation masking (configurable, default 10 deg)
+- Models ionospheric delay via Klobuchar 8-parameter model
+- Models tropospheric delay via Saastamoinen with standard atmosphere
+- Solves receiver position via iterative weighted least-squares (Eigen)
+- Computes 5 DOP quality metrics (GDOP/PDOP/HDOP/VDOP/TDOP)
+- Processes multi-epoch RINEX files (24-hour trajectories)
+- Outputs trajectory CSV + portfolio-quality analysis plots
 
-This repository documents my journey building a complete GNSS (Global Navigation Satellite System) processing engine in modern C++ — from coordinate transformations and Kalman filtering to satellite orbit computation and standalone point positioning.
-
-**Each commit represents one day of focused study.** The progression is deliberately structured to mirror how real GNSS engineers think: starting with fundamentals (coordinate systems, Kalman filters), advancing to real-data parsing (NMEA, RINEX), and culminating in full positioning algorithms.
-
-### **Goals**
-
-- 🛰️ Implement GNSS positioning algorithms **from first principles** in modern C++17
-- 📐 Master the mathematical foundations of geodesy, orbital mechanics, and state estimation
-- 🧪 Validate every implementation against real research-grade data from NASA CDDIS / IGS
-- 🛠️ Build a portfolio that demonstrates production-quality engineering practices
-
----
+--
 
 ## 🌌 Sample Output
 
-GPS sky view at the University of Memphis, January 7, 2024, 12:00 UTC — computed **entirely from raw broadcast ephemerides** using my own RINEX parser and Kepler solver:
-
-![GPS Sky Plot](Month2/Week5/4th_Sky_Plot/data/sky_plot.png)
-
-*8 visible GPS satellites, color-coded by elevation. Center = directly overhead, edge = horizon.*
-
----
-
-## 📊 Progress Tracker
-
-| Month | Focus | Status |
-|---|---|---|
-| **Month 1** | Foundations: C++, geodesy, Kalman filters, NMEA + RINEX parsing | ✅ Complete |
-| **Month 2** | GPS Positioning: ephemerides, satellite positions, visibility, sky plots | 🔄 In Progress (Week 5 ✅) |
-| Month 3 | Kalman Positioning: 6/8-state KF, carrier phase, RTS smoothing, RAIM | ⏳ Upcoming |
-| Month 4 | INS + Sensor Fusion: IMU, error-state EKF, loose & tight coupling | ⏳ Upcoming |
-| Month 5 | Spacecraft Orbit Determination: J2, drag, SRP, batch & EKF estimation | ⏳ Upcoming |
-| Month 6 | Real-Time + ROS 2: serial GPS, ROS 2 nodes, CI, documentation, demo | ⏳ Upcoming |
+## Sample Result
+ 
+Real BILL00USA IGS reference station, Jan 7 2024, 24-hour trajectory:
+ 
+- **5,760 epochs processed** at 15-second intervals
+- **~95% convergence rate** (fixes with 4+ satellites)
+- **~40m single-epoch RMS** (typical for single-frequency SPP)
+- **PDOP consistently 1.5-3.0** (excellent geometry)
+ 
+![Trajectory Analysis](Month2/Week9/3rd_Trajectory_Analysis/data/trajectory_analysis.png)
+ 
+![Engineering Diagnostics](Month2/Week9/3rd_Trajectory_Analysis/data/diagnostics.png)
 
 ---
 
-## 🏗️ Repository Structure
-
+## Repo Structure
+ 
 ```
-GNSS_SensorFusion_KF_Cpp/
-├── Month1/
-│   ├── Week1/    Coordinate systems & C++ fundamentals
-│   ├── Week2/    The Kalman filter family (KF, EKF, UKF, PF)
-│   ├── Week3/    Professional C++ workflow (CMake, Git, modular code)
-│   └── Week4/    Real GNSS data parsing (NMEA, RINEX, folium maps)
-├── Month2/
-│   ├── Week5/    Satellite position from broadcast ephemerides ✅
-│   ├── Week6/    Least-squares position solver (upcoming)
-│   ├── Week7/    DOP analysis & sky plots (upcoming)
-│   ├── Week8/    Atmospheric corrections (upcoming)
-│   └── Week9/    MILESTONE #1: Full SPP processor (upcoming)
-└── README.md
+Month1/  Foundations — Kalman family, coordinates, RINEX basics
+Month2/  GPS Positioning — this is where you are
+  Week5/  Satellite ephemeris computation
+  Week6/  Least-squares position solver
+  Week7/  DOP analysis + sky plot visualization
+  Week8/  Atmospheric corrections (Klobuchar + Saastamoinen)
+  Week9/  Multi-epoch SPP processor + analysis
 ```
-
----
-
-## ✅ Month 1 — Foundations (Complete)
-
-### **Week 1 — C++ Fundamentals + GPS Coordinates**
-
-Built the toolkit for geodesy:
-- Coordinate transformations: **LLA ↔ ECEF ↔ ENU**
-- Haversine great-circle distance computation
-- Satellite class with elevation/azimuth calculation
-- WGS84 ellipsoid mathematics
-- Eigen library integration for matrix algebra
-
-### **Week 2 — The Kalman Filter Family**
-
-Five filter variants implemented from scratch:
-| Filter | Application |
-|---|---|
-| **1D Linear KF** | GPS altitude tracking |
-| **2D Linear KF** | Position tracking in plane |
-| **Extended KF (EKF)** | Range-based positioning (non-linear) |
-| **Unscented KF (UKF)** | Sigma-point estimation |
-| **Particle Filter (PF)** | GPS-denied positioning |
-
-### **Week 3 — Professional C++ Workflow**
-
-- Modular header/implementation separation
-- **CMake** build system (cross-platform)
-- Git workflow with proper `.gitignore` and branching
-- CSV logging via `std::ofstream`
-- Python visualization with `pandas` + `matplotlib`
-
-### **Week 4 — Real GNSS Data**
-
-Crossed the bridge from simulated to real data:
-
-- **NMEA parser** for `$GPGGA` and `$GPRMC` sentences (with CSV export)
-- Real walking-path GPS data → interactive map using `folium`
-- **RINEX 3 OBS header parser** — multi-GNSS support (GPS + GLONASS + Galileo + BeiDou)
-- Tested against real CDDIS data: **BILL00USA station, IGS network**
-
----
-
-## 🔄 Month 2 — GPS Positioning From First Principles (In Progress)
-
-### **Week 5 — Satellite Position from Broadcast Ephemeris ✅**
-
-Implemented the complete **IS-GPS-200 Section 20.3.3.4.3** algorithm:
-
-#### **Day 1** — Theory: Keplerian orbital mechanics, 9-step algorithm overview
-#### **Day 2** — Kepler solver in C++
-- Iterative solution of `M = E − e·sin(E)` (transcendental equation)
-- Full implementation of the 16-parameter broadcast ephemeris model
-- Validation: orbit radius ≈ 26,560 km ✓
-
-#### **Day 3** — RINEX 3 Navigation File Parser
-- Parsed **440 GPS ephemerides** from `BRDC00IGS_R_20240070000_01D_MN.rnx`
-- Handles Fortran-style scientific notation (`D` → `E`)
-- Fixed-column extraction with defensive error handling
-- Real data from **NASA CDDIS IGS archive**
-
-#### **Day 4** — Multi-Satellite Visibility
-- Best-ephemeris selection algorithm (closest in time per PRN)
-- LLA → ECEF (WGS84)
-- ECEF → ENU rotation matrix
-- Elevation and azimuth computation for all visible satellites
-- Receiver location: U of M Campus, Memphis (35.1186°N, 89.9387°W)
-
-#### **Day 5** — Professional Sky Plot Visualization
-- Polar plot of all visible satellites at a given epoch
-- Color-coded by elevation (high/medium/low)
-- Compass-convention compass directions (N at top, clockwise)
-- PNG + PDF output for portfolio use
+ 
+## Roadmap
+ 
+- Month 3: Kalman filtering for positioning (target: 5-15m RMS)
+- Month 4: GNSS/INS sensor fusion (15-state error-state EKF)
+- Month 5: LEO orbit determination
+- Month 6: ROS 2 integration + real-time pipelines
+``
 
 ---
 

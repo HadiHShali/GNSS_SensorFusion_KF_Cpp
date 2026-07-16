@@ -61,7 +61,8 @@ Month2/  GPS Positioning — this is where you are
 ## Roadmap
  
 - Month 3 (in progress): Kalman filtering for positioning (target: 5-15m RMS)
-        Standalone KF verification on synthetic data (Week 10):
+Standalone KF verification on synthetic data (Week 10):
+
 ![KF Static Test](Month3/Week10/3rd_KF_Class/build/Release/kf_static_test.png)
 
 - Month 4: GNSS/INS sensor fusion (15-state error-state EKF)

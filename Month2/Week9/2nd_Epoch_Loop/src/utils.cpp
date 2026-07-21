@@ -57,3 +57,22 @@ void ecefToLla(double X, double Y, double Z,
 	lat_deg = lat_rad * RAD2DEG;
 	lon_deg = lon_rad * RAD2DEG;
 }
+
+void llaToEcef(double lat_deg, double lon_deg, double h_m, double &x, double& y, double& z)
+{
+	const double a = 6378137.0; // WGS84 semi-major
+	const double e2 = 6.69437999014e-3;  //eccentricity squared
+	
+	double phi = lat_deg * M_PI /180.0;
+	double lam = lon_deg * M_PI /180.0;
+	
+	double sin_phi = sin(phi);
+	double cos_phi = cos(phi);
+	
+	double N = a / sqrt(1.0 - e2 * sin_phi * sin_phi);
+	
+	x = (N + h_m) * cos_phi * cos(lam);
+	y = (N + h_m) * cos_phi * sin(lam);
+    z = (N * (1.0 - e2) + h_m) * sin_phi;
+
+}

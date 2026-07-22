@@ -34,7 +34,7 @@ int main() {
 	// ------ initialize the KF with the first epoch-----------------------//
 	// 
 	// static station -> small q_accel
-	KalmanFilterGps kf(0.0001);
+	KalmanFilterGps kf(0.001);
 
 	// Initial State from FIRST epoch (should be inj ECEF)
 	double x0, y0, z0;
@@ -89,14 +89,17 @@ int main() {
 		// Step2: Predict (skip the first epoch)
 		if (i > 0) {
 			double dt = e.t_gps - prev_t;
-			if (dt <= 0.0) dt = 15.0;   // safety
+			if (dt <= 0.0 || dt>60.0) dt = 15.0;   // safety
 			kf.predict(dt);
 		}
 
 
 		//Step3: Measurement Noise (R) from sigma-0
 		// R = (sigma_pos) ^ 2 · I  where sigma_pos scales with sigma-0
-		double sigma_pos = e.sigma0_m;   // simple: 1:1 mapping
+		// sigma0_m measures fit quality, NOT absolute accuracy.
+		// Real-world SPP has systematic error the LS residual doesn't capture.
+		// Inflate substantially — try 2-3x, or add a floor:
+		double sigma_pos = std::max(e.sigma0_m * 2.5, 15.0);
 		Matrix3d R = Matrix3d::Identity() * (sigma_pos * sigma_pos);
 
 
@@ -148,9 +151,9 @@ int main() {
 	MatrixXd Pf = kf.getCovariance();
 
 	// Compare final KF position vs BILL00USA truth
-	const double TRUE_X = -2420422.0410;
-	const double TRUE_Y = -4737132.4707;
-	const double TRUE_Z = 3507827.6034;
+	const double TRUE_X = -2420420.501;
+	const double TRUE_Y = -4737131.551;
+	const double TRUE_Z = 3507827.665;
 
 	double dx = xf(0) - TRUE_X;
 	double dy = xf(1) - TRUE_Y;

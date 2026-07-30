@@ -100,7 +100,7 @@ PositionSolution solveGpsPosition(const std::vector<Observation>& obs, bool use_
 		return sol;
 	}
 
-	// initial guess
+	// initial guess: center of the Earth
 	sol.x = -2420000.0;   // approximate BILL00USA
 	sol.y = -4737000.0;
 	sol.z =  3507000.0;

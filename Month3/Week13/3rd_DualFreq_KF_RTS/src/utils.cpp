@@ -76,4 +76,3 @@ void llaToEcef(double lat_deg, double lon_deg, double h_m, double &x, double& y,
     z = (N * (1.0 - e2) + h_m) * sin_phi;
 
 }
-

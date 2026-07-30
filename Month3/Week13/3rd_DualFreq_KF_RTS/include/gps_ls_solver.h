@@ -12,7 +12,6 @@ struct Observation
 	double sat_x, sat_y, sat_z;
 	double pseudorange;
 	double elevation_deg = 90.0; // optional, default = overhead
-	bool used_iono_free = false;
 };
 
 struct DopValues
